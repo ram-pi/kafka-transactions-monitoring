@@ -6,8 +6,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 
 import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -41,8 +43,9 @@ public class TransactionalConsumeProduceFlow {
             String transactionalId) {
         Properties props = Utils.loadProps(configFilepath);
         props.setProperty(ProducerConfig.TRANSACTIONAL_ID_CONFIG, transactionalId);
+        props.setProperty(ConsumerConfig.GROUP_ID_CONFIG, UUID.randomUUID().toString());
         this.producer = new KafkaProducer<>(props);
-        this.consumer = new KafkaConsumer<>(Utils.loadProps(configFilepath));
+        this.consumer = new KafkaConsumer<>(props);
         this.consumeTopic = consumeTopic;
         this.produceTopic = produceTopic;
         this.isRunning = true;
