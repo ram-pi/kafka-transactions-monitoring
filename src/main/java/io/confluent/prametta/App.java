@@ -1,6 +1,8 @@
 package io.confluent.prametta;
 
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -34,27 +36,32 @@ public class App {
         // Run producers in 2 different threads
         ExecutorService exec = Executors.newCachedThreadPool();
 
-        // 1. Create topics
+        // Create topics
+        Map<String, String> topicConfig = new HashMap<>();
+        topicConfig.put("delete.retention.ms", "60000");
+        topicConfig.put("min.insync.replicas", "2");
         log.info("Creating topics...");
         AdminClient adminClient = AdminClient.create(Utils.loadProps(CLIENT_CONFIG_PATH));
         NewTopic newTopic = new NewTopic(INPUT_TOPIC, 10, (short) 3);
+        newTopic.configs(topicConfig);
         adminClient.createTopics(Collections.singleton(newTopic));
         newTopic = new NewTopic(OUTPUT_TOPIC, 10, (short) 3);
+        newTopic.configs(topicConfig);
         adminClient.createTopics(Collections.singleton(newTopic));
 
-        // 2. Input Producer
+        // Source Producer
         for (int i = 0; i < concurrent; i++) {
             exec.execute(() -> {
-                log.info("Running first producer...");
+                log.info("Running source producer...");
                 FakeGeneratorProducer producer = new FakeGeneratorProducer(CLIENT_CONFIG_PATH, INPUT_TOPIC);
                 producer.produce();
             });
         }
 
-        // 3. Transactional Consume-Produce
+        // Transactional Consume-Produce Flow
         for (int i = 0; i < concurrent; i++) {
             exec.execute(() -> {
-                log.info("Running transactional consume-produce...");
+                log.info("Running transactional consume-produce flow...");
                 TransactionalConsumeProduceFlow transactionalConsumeProduceFlow = new TransactionalConsumeProduceFlow(
                         CLIENT_CONFIG_PATH, INPUT_TOPIC, OUTPUT_TOPIC,
                         TRANSACTIONAL_ID.concat("-").concat(UUID.randomUUID().toString()));
