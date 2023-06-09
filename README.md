@@ -3,5 +3,5 @@
 ## Run 
 
 ```
-mvn exec:exec
+mvn compile exec:exec
 ```

@@ -33,6 +33,7 @@ public class TransactionalConsumeProduceFlow {
     Consumer<String, String> consumer;
     String consumeTopic;
     String produceTopic;
+    int pollDurationMillis;
     boolean isRunning;
 
     @SneakyThrows
@@ -45,10 +46,17 @@ public class TransactionalConsumeProduceFlow {
         this.consumeTopic = consumeTopic;
         this.produceTopic = produceTopic;
         this.isRunning = true;
+
+        pollDurationMillis = 1000;
+        if (props.getProperty("poll.ms") != null) {
+            pollDurationMillis = Integer.valueOf(props.getProperty("poll.ms"));
+        }
     }
 
     public void consumerAndProduce() {
-        Runtime.getRuntime().addShutdownHook(new Thread(this::close));
+        Runtime.getRuntime().addShutdownHook(
+                new Thread(
+                        () -> isRunning = false));
 
         // Subscribe
         consumer.subscribe(Collections.singleton(consumeTopic));
@@ -57,7 +65,8 @@ public class TransactionalConsumeProduceFlow {
         producer.initTransactions();
 
         while (isRunning) {
-            ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
+            ConsumerRecords<String, String> records = consumer
+                    .poll(Duration.ofMillis(pollDurationMillis));
             producer.beginTransaction();
             for (ConsumerRecord<String, String> consumerRecord : records) {
                 // Send consumer record
@@ -95,9 +104,5 @@ public class TransactionalConsumeProduceFlow {
 
         // flush and close producer
         producer.close();
-    }
-
-    public void close() {
-        this.isRunning = false;
     }
 }

@@ -1,6 +1,8 @@
 package io.confluent.prametta;
 
 import java.util.Collections;
+import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -18,10 +20,17 @@ public class App {
     public static final String CLIENT_CONFIG_PATH = "./client.properties";
     public static final String INPUT_TOPIC = "input";
     public static final String OUTPUT_TOPIC = "output";
-    public static final String TRANSACTIONAL_ID = "txn-prod-1";
+    public static final String TRANSACTIONAL_ID = "txn-prod";
+    public static final int CONCURRENT_EXEC = 100;
 
     @SneakyThrows
     public static void main(String[] args) {
+        Properties props = Utils.loadProps(CLIENT_CONFIG_PATH);
+        int concurrent = CONCURRENT_EXEC;
+        if (props.getProperty("concurrent") != null) {
+            concurrent = Integer.valueOf(props.getProperty("concurrent"));
+        }
+
         // Run producers in 2 different threads
         ExecutorService exec = Executors.newCachedThreadPool();
 
@@ -34,18 +43,23 @@ public class App {
         adminClient.createTopics(Collections.singleton(newTopic));
 
         // 2. Input Producer
-        exec.execute(() -> {
-            log.info("Running first producer...");
-            FakeGeneratorProducer producer = new FakeGeneratorProducer(CLIENT_CONFIG_PATH, INPUT_TOPIC);
-            producer.produce();
-        });
+        for (int i = 0; i < concurrent; i++) {
+            exec.execute(() -> {
+                log.info("Running first producer...");
+                FakeGeneratorProducer producer = new FakeGeneratorProducer(CLIENT_CONFIG_PATH, INPUT_TOPIC);
+                producer.produce();
+            });
+        }
 
         // 3. Transactional Consume-Produce
-        exec.execute(() -> {
-            log.info("Running transactional consume-produce...");
-            TransactionalConsumeProduceFlow transactionalConsumeProduceFlow = new TransactionalConsumeProduceFlow(
-                    CLIENT_CONFIG_PATH, INPUT_TOPIC, OUTPUT_TOPIC, TRANSACTIONAL_ID);
-            transactionalConsumeProduceFlow.consumerAndProduce();
-        });
+        for (int i = 0; i < concurrent; i++) {
+            exec.execute(() -> {
+                log.info("Running transactional consume-produce...");
+                TransactionalConsumeProduceFlow transactionalConsumeProduceFlow = new TransactionalConsumeProduceFlow(
+                        CLIENT_CONFIG_PATH, INPUT_TOPIC, OUTPUT_TOPIC,
+                        TRANSACTIONAL_ID.concat("-").concat(UUID.randomUUID().toString()));
+                transactionalConsumeProduceFlow.consumerAndProduce();
+            });
+        }
     }
 }
